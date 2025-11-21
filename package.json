@@ -1,0 +1,30 @@
+{
+  "name": "polkadot-telemetry-query",
+  "version": "1.0.0",
+  "description": "Query Polkadot and Kusama telemetry for validator locations",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "query": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.2"
+  },
+  "keywords": [
+    "polkadot",
+    "kusama",
+    "telemetry",
+    "validator"
+  ],
+  "author": "",
+  "license": "MIT"
+}
