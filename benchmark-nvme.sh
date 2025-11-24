@@ -356,7 +356,7 @@ run_randread_benchmark() {
     print_info "Test size: $TEST_SIZE"
     print_info "Runtime per test: ${RUNTIME}s"
     echo ""
-    echo -e "${YELLOW}Testing methodology: FIO 4K random read at QD1, QD32, QD256${NC}"
+    echo -e "${YELLOW}Testing methodology: FIO 4K random read at QD32, QD256${NC}"
     echo ""
 
     # Create test directory if needed
@@ -366,26 +366,16 @@ run_randread_benchmark() {
     # Results array
     declare -A results
 
-    # Test 1: Random Read 4K (QD1) - Latency
-    echo -e "${YELLOW}[1/3] Random Read 4K (QD1) - Latency test${NC}"
-    local rand_read_qd1=$(fio --name=rand_read_qd1 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=1 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
-    local rand_read_qd1_iops=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
-    local rand_read_qd1_lat=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.lat_ns.mean / 1000' 2>/dev/null || echo "0")
-    echo "  IOPS: ${rand_read_qd1_iops}, Latency: ${rand_read_qd1_lat} µs"
-    results["rand_read_qd1_iops"]=$rand_read_qd1_iops
-    results["rand_read_qd1_lat"]=$rand_read_qd1_lat
-
-    # Test 2: Random Read 4K (QD32) - Typical workload
-    echo -e "${YELLOW}[2/3] Random Read 4K (QD32) - Typical workload${NC}"
+    # Test 1: Random Read 4K (QD32) - Typical workload
+    echo -e "${YELLOW}[1/2] Random Read 4K (QD32) - Typical workload${NC}"
     local rand_read_qd32=$(fio --name=rand_read_qd32 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
         --numjobs=1 --iodepth=32 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_qd32}"
     results["rand_read_qd32"]=$rand_read_qd32
 
-    # Test 3: Random Read 4K (QD256) - Manufacturer spec
-    echo -e "${YELLOW}[3/3] Random Read 4K (QD256) - MFG Spec Comparison${NC}"
+    # Test 2: Random Read 4K (QD256) - Manufacturer spec
+    echo -e "${YELLOW}[2/2] Random Read 4K (QD256) - MFG Spec Comparison${NC}"
     echo "  (Micron spec: 800,000 IOPS at QD256)"
     local rand_read_qd256=$(fio --name=rand_read_qd256 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
         --numjobs=1 --iodepth=256 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
@@ -405,15 +395,15 @@ run_randread_benchmark() {
         echo "Runtime: ${RUNTIME}s per test"
         echo ""
         echo "4K Random Read Results:"
-        echo "  QD1:   ${results[rand_read_qd1_iops]} IOPS, ${results[rand_read_qd1_lat]} µs latency"
         echo "  QD32:  ${results[rand_read_qd32]} IOPS"
         echo "  QD256: ${results[rand_read_qd256]} IOPS (MFG spec: 800,000)"
         echo ""
         echo "Testing Methodology:"
         echo "  Tool: FIO (Flexible I/O Tester)"
         echo "  Block size: 4K"
-        echo "  Queue depths: QD1, QD32, QD256"
+        echo "  Queue depths: QD32, QD256"
         echo "  I/O pattern: Random read"
+        echo "  I/O engine: libaio with direct I/O"
         echo "  Runtime: ${RUNTIME}s per test"
         echo "  Test location: Filesystem-level"
     } > "$result_file"
@@ -423,7 +413,6 @@ run_randread_benchmark() {
 
     # Print summary
     echo -e "${GREEN}=== Summary ===${NC}"
-    echo "  QD1 (latency):    ${results[rand_read_qd1_iops]} IOPS @ ${results[rand_read_qd1_lat]} µs"
     echo "  QD32 (typical):   ${results[rand_read_qd32]} IOPS"
     echo "  QD256 (max):      ${results[rand_read_qd256]} IOPS (${pct_of_spec}% of 800K spec)"
     echo ""
@@ -437,7 +426,7 @@ show_usage() {
     echo "  -s, --size SIZE       Test file size (default: 4G)"
     echo "  -t, --time SECONDS    Runtime per test in seconds (default: 60)"
     echo "  -o, --output DIR      Output directory for results (default: ./benchmark_results)"
-    echo "  -r, --randread        4K random read only (QD1, QD32, QD256) - quick test"
+    echo "  -r, --randread        4K random read only (QD32, QD256) - quick test"
     echo "  -i, --info            Show drive info and settings only (no benchmark)"
     echo "  -c, --compare         Compare existing benchmark results"
     echo "  -h, --help            Show this help message"
