@@ -207,7 +207,7 @@ run_fio_benchmark() {
     # Test 3: Random Read 4K
     echo -e "${YELLOW}[3/10] Random Read 4K (QD32)${NC}"
     local rand_read_4k=$(fio --name=rand_read_4k --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        --numjobs=1 --iodepth=32 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_4k}"
     results["rand_read_4k"]=$rand_read_4k
@@ -215,7 +215,7 @@ run_fio_benchmark() {
     # Test 4: Random Write 4K
     echo -e "${YELLOW}[4/10] Random Write 4K (QD32)${NC}"
     local rand_write_4k=$(fio --name=rand_write_4k --directory=$test_dir --rw=randwrite --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        --numjobs=1 --iodepth=32 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].write.iops' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_write_4k}"
     results["rand_write_4k"]=$rand_write_4k
@@ -224,7 +224,7 @@ run_fio_benchmark() {
     echo -e "${YELLOW}[5/10] Random Read 4K (QD256) - MFG Spec Comparison${NC}"
     echo "  (Micron spec: 800,000 IOPS at QD256)"
     local rand_read_qd256=$(fio --name=rand_read_qd256 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=256 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        --numjobs=1 --iodepth=256 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     local pct_of_spec=$(echo "scale=1; $rand_read_qd256 / 8000" | bc 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_qd256} (${pct_of_spec}% of spec)"
@@ -233,7 +233,7 @@ run_fio_benchmark() {
     # Test 6: Random Write 4K (QD256)
     echo -e "${YELLOW}[6/10] Random Write 4K (QD256)${NC}"
     local rand_write_qd256=$(fio --name=rand_write_qd256 --directory=$test_dir --rw=randwrite --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=256 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        --numjobs=1 --iodepth=256 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].write.iops' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_write_qd256}"
     results["rand_write_qd256"]=$rand_write_qd256
@@ -241,17 +241,17 @@ run_fio_benchmark() {
     # Test 7: Random Read 4K (QD1)
     echo -e "${YELLOW}[7/10] Random Read 4K (QD1) - Latency test${NC}"
     local rand_read_qd1=$(fio --name=rand_read_qd1 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
+        --numjobs=1 --iodepth=1 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
     local rand_read_qd1_iops=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     local rand_read_qd1_lat=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.lat_ns.mean / 1000' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_qd1_iops}, Latency: ${rand_read_qd1_lat} µs"
     results["rand_read_qd1_iops"]=$rand_read_qd1_iops
     results["rand_read_qd1_lat"]=$rand_read_qd1_lat
 
-    # Test 6: Random Write 4K (QD1)
-    echo -e "${YELLOW}[6/8] Random Write 4K (QD1) - Latency test${NC}"
+    # Test 8: Random Write 4K (QD1)
+    echo -e "${YELLOW}[8/10] Random Write 4K (QD1) - Latency test${NC}"
     local rand_write_qd1=$(fio --name=rand_write_qd1 --directory=$test_dir --rw=randwrite --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
+        --numjobs=1 --iodepth=1 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
     local rand_write_qd1_iops=$(echo "$rand_write_qd1" | jq -r '.jobs[0].write.iops' 2>/dev/null || echo "0")
     local rand_write_qd1_lat=$(echo "$rand_write_qd1" | jq -r '.jobs[0].write.lat_ns.mean / 1000' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_write_qd1_iops}, Latency: ${rand_write_qd1_lat} µs"
@@ -261,7 +261,7 @@ run_fio_benchmark() {
     # Test 9: Mixed Random R/W (70/30)
     echo -e "${YELLOW}[9/10] Mixed Random R/W 4K (70/30, QD32)${NC}"
     local mixed_rw=$(fio --name=mixed_rw --directory=$test_dir --rw=randrw --rwmixread=70 --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
+        --numjobs=1 --iodepth=32 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
     local mixed_read_iops=$(echo "$mixed_rw" | jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     local mixed_write_iops=$(echo "$mixed_rw" | jq -r '.jobs[0].write.iops' 2>/dev/null || echo "0")
     echo "  Read IOPS: ${mixed_read_iops}, Write IOPS: ${mixed_write_iops}"
@@ -369,7 +369,7 @@ run_randread_benchmark() {
     # Test 1: Random Read 4K (QD1) - Latency
     echo -e "${YELLOW}[1/3] Random Read 4K (QD1) - Latency test${NC}"
     local rand_read_qd1=$(fio --name=rand_read_qd1 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
+        --numjobs=1 --iodepth=1 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
     local rand_read_qd1_iops=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     local rand_read_qd1_lat=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.lat_ns.mean / 1000' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_qd1_iops}, Latency: ${rand_read_qd1_lat} µs"
@@ -379,7 +379,7 @@ run_randread_benchmark() {
     # Test 2: Random Read 4K (QD32) - Typical workload
     echo -e "${YELLOW}[2/3] Random Read 4K (QD32) - Typical workload${NC}"
     local rand_read_qd32=$(fio --name=rand_read_qd32 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        --numjobs=1 --iodepth=32 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_qd32}"
     results["rand_read_qd32"]=$rand_read_qd32
@@ -388,7 +388,7 @@ run_randread_benchmark() {
     echo -e "${YELLOW}[3/3] Random Read 4K (QD256) - MFG Spec Comparison${NC}"
     echo "  (Micron spec: 800,000 IOPS at QD256)"
     local rand_read_qd256=$(fio --name=rand_read_qd256 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
-        --numjobs=1 --iodepth=256 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        --numjobs=1 --iodepth=256 --ioengine=libaio --direct=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
     local pct_of_spec=$(echo "scale=1; $rand_read_qd256 / 8000" | bc 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_read_qd256} (${pct_of_spec}% of spec)"
