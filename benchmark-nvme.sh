@@ -42,7 +42,7 @@ check_dependencies() {
 
     local missing_deps=()
 
-    for cmd in fio nvme lsblk smartctl; do
+    for cmd in fio nvme lsblk smartctl bc jq; do
         if ! command -v $cmd &> /dev/null; then
             missing_deps+=($cmd)
         else
@@ -54,10 +54,10 @@ check_dependencies() {
         print_error "Missing dependencies: ${missing_deps[*]}"
         echo ""
         echo "Install on Ubuntu:"
-        echo "  sudo apt update && sudo apt install -y fio nvme-cli smartmontools"
+        echo "  sudo apt update && sudo apt install -y fio nvme-cli smartmontools bc jq"
         echo ""
         echo "Install on Arch Linux:"
-        echo "  sudo pacman -S fio nvme-cli smartmontools"
+        echo "  sudo pacman -S fio nvme-cli smartmontools bc jq"
         echo ""
         exit 1
     fi
@@ -188,7 +188,7 @@ run_fio_benchmark() {
     declare -A results
 
     # Test 1: Sequential Read
-    echo -e "${YELLOW}[1/8] Sequential Read (1M block)${NC}"
+    echo -e "${YELLOW}[1/10] Sequential Read (1M block)${NC}"
     local seq_read=$(fio --name=seq_read --directory=$test_dir --rw=read --bs=1M --size=$TEST_SIZE \
         --numjobs=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.bw_bytes / 1048576' 2>/dev/null || echo "0")
@@ -196,7 +196,7 @@ run_fio_benchmark() {
     results["seq_read"]=$seq_read
 
     # Test 2: Sequential Write
-    echo -e "${YELLOW}[2/8] Sequential Write (1M block)${NC}"
+    echo -e "${YELLOW}[2/10] Sequential Write (1M block)${NC}"
     local seq_write=$(fio --name=seq_write --directory=$test_dir --rw=write --bs=1M --size=$TEST_SIZE \
         --numjobs=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].write.bw_bytes / 1048576' 2>/dev/null || echo "0")
@@ -204,7 +204,7 @@ run_fio_benchmark() {
     results["seq_write"]=$seq_write
 
     # Test 3: Random Read 4K
-    echo -e "${YELLOW}[3/8] Random Read 4K (QD32)${NC}"
+    echo -e "${YELLOW}[3/10] Random Read 4K (QD32)${NC}"
     local rand_read_4k=$(fio --name=rand_read_4k --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
         --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
@@ -212,15 +212,33 @@ run_fio_benchmark() {
     results["rand_read_4k"]=$rand_read_4k
 
     # Test 4: Random Write 4K
-    echo -e "${YELLOW}[4/8] Random Write 4K (QD32)${NC}"
+    echo -e "${YELLOW}[4/10] Random Write 4K (QD32)${NC}"
     local rand_write_4k=$(fio --name=rand_write_4k --directory=$test_dir --rw=randwrite --bs=4k --size=$TEST_SIZE \
         --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].write.iops' 2>/dev/null || echo "0")
     echo "  IOPS: ${rand_write_4k}"
     results["rand_write_4k"]=$rand_write_4k
 
-    # Test 5: Random Read 4K (QD1)
-    echo -e "${YELLOW}[5/8] Random Read 4K (QD1) - Latency test${NC}"
+    # Test 5: Random Read 4K (QD256) - Manufacturer spec comparison
+    echo -e "${YELLOW}[5/10] Random Read 4K (QD256) - MFG Spec Comparison${NC}"
+    echo "  (Micron spec: 800,000 IOPS at QD256)"
+    local rand_read_qd256=$(fio --name=rand_read_qd256 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
+        --numjobs=1 --iodepth=256 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
+    local pct_of_spec=$(echo "scale=1; $rand_read_qd256 / 8000" | bc 2>/dev/null || echo "0")
+    echo "  IOPS: ${rand_read_qd256} (${pct_of_spec}% of spec)"
+    results["rand_read_qd256"]=$rand_read_qd256
+
+    # Test 6: Random Write 4K (QD256)
+    echo -e "${YELLOW}[6/10] Random Write 4K (QD256)${NC}"
+    local rand_write_qd256=$(fio --name=rand_write_qd256 --directory=$test_dir --rw=randwrite --bs=4k --size=$TEST_SIZE \
+        --numjobs=1 --iodepth=256 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
+        jq -r '.jobs[0].write.iops' 2>/dev/null || echo "0")
+    echo "  IOPS: ${rand_write_qd256}"
+    results["rand_write_qd256"]=$rand_write_qd256
+
+    # Test 7: Random Read 4K (QD1)
+    echo -e "${YELLOW}[7/10] Random Read 4K (QD1) - Latency test${NC}"
     local rand_read_qd1=$(fio --name=rand_read_qd1 --directory=$test_dir --rw=randread --bs=4k --size=$TEST_SIZE \
         --numjobs=1 --iodepth=1 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
     local rand_read_qd1_iops=$(echo "$rand_read_qd1" | jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
@@ -239,8 +257,8 @@ run_fio_benchmark() {
     results["rand_write_qd1_iops"]=$rand_write_qd1_iops
     results["rand_write_qd1_lat"]=$rand_write_qd1_lat
 
-    # Test 7: Mixed Random R/W (70/30)
-    echo -e "${YELLOW}[7/8] Mixed Random R/W 4K (70/30, QD32)${NC}"
+    # Test 9: Mixed Random R/W (70/30)
+    echo -e "${YELLOW}[9/10] Mixed Random R/W 4K (70/30, QD32)${NC}"
     local mixed_rw=$(fio --name=mixed_rw --directory=$test_dir --rw=randrw --rwmixread=70 --bs=4k --size=$TEST_SIZE \
         --numjobs=1 --iodepth=32 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null)
     local mixed_read_iops=$(echo "$mixed_rw" | jq -r '.jobs[0].read.iops' 2>/dev/null || echo "0")
@@ -249,8 +267,8 @@ run_fio_benchmark() {
     results["mixed_read_iops"]=$mixed_read_iops
     results["mixed_write_iops"]=$mixed_write_iops
 
-    # Test 8: Multi-threaded Sequential
-    echo -e "${YELLOW}[8/8] Multi-threaded Sequential Read (4 jobs)${NC}"
+    # Test 10: Multi-threaded Sequential
+    echo -e "${YELLOW}[10/10] Multi-threaded Sequential Read (4 jobs)${NC}"
     local mt_seq_read=$(fio --name=mt_seq_read --directory=$test_dir --rw=read --bs=1M --size=$TEST_SIZE \
         --numjobs=4 --time_based --runtime=$RUNTIME --group_reporting --output-format=json 2>/dev/null | \
         jq -r '.jobs[0].read.bw_bytes / 1048576' 2>/dev/null || echo "0")
@@ -272,6 +290,8 @@ run_fio_benchmark() {
         echo "  Sequential Write: ${results[seq_write]} MB/s"
         echo "  Random Read 4K (QD32): ${results[rand_read_4k]} IOPS"
         echo "  Random Write 4K (QD32): ${results[rand_write_4k]} IOPS"
+        echo "  Random Read 4K (QD256): ${results[rand_read_qd256]} IOPS (MFG spec: 800,000)"
+        echo "  Random Write 4K (QD256): ${results[rand_write_qd256]} IOPS"
         echo "  Random Read 4K (QD1): ${results[rand_read_qd1_iops]} IOPS, ${results[rand_read_qd1_lat]} µs"
         echo "  Random Write 4K (QD1): ${results[rand_write_qd1_iops]} IOPS, ${results[rand_write_qd1_lat]} µs"
         echo "  Mixed R/W 70/30 (QD32): ${results[mixed_read_iops]} / ${results[mixed_write_iops]} IOPS"
