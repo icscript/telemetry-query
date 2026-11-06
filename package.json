@@ -11,7 +11,7 @@
     "query": "tsx src/index.ts"
   },
   "dependencies": {
-    "ws": "^8.14.2"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
